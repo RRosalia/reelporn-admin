@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axiosInstance from '@/lib/axios';
+import { initializeEcho } from '@/lib/echo-config';
 
 interface User {
   username: string;
@@ -28,6 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
+      // Initialize Echo with the token for authenticated channels
+      initializeEcho(token);
     }
     setLoading(false);
   }, []);
@@ -39,12 +42,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
 
-      const { token } = response.data;
+      const { token, user } = response.data.data;
 
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ username }));
+      localStorage.setItem('user', JSON.stringify({ username: user.username }));
 
-      setUser({ username });
+      setUser({ username: user.username });
+
+      // Initialize Echo with the auth token for WebSocket connections
+      initializeEcho(token);
+
       router.push('/dashboard');
     } catch (error) {
       throw error;
@@ -55,6 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+
+    // Disconnect Echo on logout
+    if (typeof window !== 'undefined' && window.Echo) {
+      window.Echo.disconnect();
+    }
+
     router.push('/login');
   };
 

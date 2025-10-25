@@ -1,46 +1,56 @@
-# Build stage
-FROM node:20-alpine AS builder
+FROM oven/bun:latest AS base
 
+# Install dependencies only when needed
+FROM base AS deps
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install dependencies with cache mount
+COPY package.json bun.lock* ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
-# Install dependencies
-RUN npm ci
-
-# Copy source code
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the application
-RUN npm run build
+# Next.js collects completely anonymous telemetry data about general usage.
+# Learn more here: https://nextjs.org/telemetry
+# Uncomment the following line in case you want to disable telemetry during the build.
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Production stage
-FROM node:20-alpine AS runner
+# Build with Next.js cache mount
+RUN --mount=type=cache,target=/app/.next/cache \
+    bun run build
 
+# Production image, copy all the files and run next
+FROM oven/bun:alpine AS runner
 WORKDIR /app
 
-# Set environment to production
 ENV NODE_ENV=production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
 COPY --from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Switch to non-root user
 USER nextjs
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Set environment variables
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
 CMD ["node", "server.js"]

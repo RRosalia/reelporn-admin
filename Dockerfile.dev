@@ -1,22 +1,22 @@
-FROM node:20-alpine
+FROM oven/bun:latest
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json bun.lock* ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install
 
-# Copy source code
+# Copy the rest of the application
 COPY . .
 
-# Expose the port the app runs on
+# Create .next directory with proper permissions for cache
+RUN mkdir -p .next/cache && chmod -R 777 .next
+
+# Expose port 3000 for Next.js dev server
 EXPOSE 3000
 
-# Set environment variables
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
 # Start the development server
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]
