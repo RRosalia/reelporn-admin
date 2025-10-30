@@ -166,22 +166,27 @@ export default function AssetDetailPage() {
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
               Media
             </h3>
-            {asset.thumbnail_url ? (
-              <div
-                onClick={() => setShowMediaModal(true)}
-                className="cursor-pointer group relative"
-              >
-                <img
-                  src={asset.thumbnail_url}
-                  alt={getTitle(asset)}
-                  className="w-full rounded-lg transition-opacity group-hover:opacity-90"
-                />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
-                  <svg className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                  </svg>
+            {asset.media?.url ? (
+              <>
+                <div
+                  onClick={() => setShowMediaModal(true)}
+                  className="cursor-pointer group relative"
+                >
+                  <img
+                    src={asset.media.url}
+                    alt={getTitle(asset)}
+                    className="w-full rounded-lg transition-opacity group-hover:opacity-90"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
+                    <svg className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
+                <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                  <span className="font-medium">Size:</span> {(asset.media.size / 1024 / 1024).toFixed(2)} MB
+                </div>
+              </>
             ) : (
               <div className="flex items-center justify-center w-full h-64 bg-zinc-100 dark:bg-zinc-700 rounded-lg">
                 <div className="text-center">
@@ -373,7 +378,7 @@ export default function AssetDetailPage() {
       </div>
 
       {/* Media Enlargement Modal */}
-      {showMediaModal && asset.thumbnail_url && (
+      {showMediaModal && asset.media?.url && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setShowMediaModal(false)}
@@ -388,7 +393,7 @@ export default function AssetDetailPage() {
               </svg>
             </button>
             <img
-              src={asset.thumbnail_url}
+              src={asset.media.url}
               alt={getTitle(asset)}
               className="max-w-full max-h-full object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}

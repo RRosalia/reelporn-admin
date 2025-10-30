@@ -1,9 +1,27 @@
+export interface AssetMedia {
+  id: string;
+  uuid: string;
+  collection_name: string;
+  name: string;
+  file_name: string;
+  mime_type: string;
+  size: number;
+  url: string;
+  is_image: boolean;
+  is_video: boolean;
+  custom_properties: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Asset {
   id: string;
   slug: string;
   title: Record<string, string>;
   description: Record<string, string>;
-  thumbnail_url: string;
+  thumbnail_url?: string;
+  media_url?: string;
+  media?: AssetMedia;
   is_featured: boolean;
   is_premium: boolean;
   asset_type: string;
