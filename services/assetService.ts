@@ -4,6 +4,7 @@ import type {
   Asset,
   AssetFilters,
 } from '@/types/asset';
+import type { GenerateAssetFormData } from '@/components/GenerateAssetModal';
 
 class AssetService {
   private basePath = '/assets';
@@ -33,6 +34,11 @@ class AssetService {
 
   async getById(id: string): Promise<Asset> {
     const response = await axiosInstance.get<{ data: Asset }>(`${this.basePath}/${id}`);
+    return response.data.data;
+  }
+
+  async generate(data: GenerateAssetFormData): Promise<Asset> {
+    const response = await axiosInstance.post<{ data: Asset }>(`${this.basePath}/generate`, data);
     return response.data.data;
   }
 }

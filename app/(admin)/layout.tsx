@@ -21,7 +21,13 @@ export default function DashboardLayout({
   const navItems = [
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'Users', href: '/users' },
-    { name: 'Pornstars', href: '/pornstars' },
+    {
+      name: 'Pornstars',
+      href: '/pornstars',
+      subItems: [
+        { name: 'Pending Review', href: '/pornstars?status=pending_review' }
+      ]
+    },
     { name: 'Categories', href: '/categories' },
     { name: 'Assets', href: '/assets' },
     { name: 'Plans', href: '/plans' },
@@ -64,17 +70,31 @@ export default function DashboardLayout({
           <aside className="w-64 border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-800 min-h-[calc(100vh-4rem)]">
             <nav className="p-4 space-y-1">
               {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    pathname === item.href
-                      ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50'
-                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50'
-                  }`}
-                >
-                  {item.name}
-                </Link>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      pathname === item.href || pathname.startsWith(item.href + '/')
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50'
+                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50'
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                  {'subItems' in item && item.subItems && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.subItems.map((subItem) => (
+                        <Link
+                          key={subItem.href}
+                          href={subItem.href}
+                          className="block rounded-md px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-50"
+                        >
+                          {subItem.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </nav>
           </aside>

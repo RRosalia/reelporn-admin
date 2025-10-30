@@ -22,6 +22,7 @@ export interface Pornstar {
   id: string;
   slug: string;
   type: 'real' | 'virtual';
+  status: 'active' | 'inactive' | 'pending_review' | 'draft';
   first_name: string;
   last_name: string;
   bio: Bio;
@@ -69,6 +70,7 @@ export interface PornstarFilters {
   per_page?: number;
   trashed?: boolean;
   type?: 'real' | 'virtual';
+  status?: 'active' | 'inactive' | 'pending_review' | 'draft';
   country_id?: number;
   query?: string;
 }

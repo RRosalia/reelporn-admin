@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { pornstarService } from '@/services/pornstarService';
 import { countryService } from '@/services/countryService';
 import type { Pornstar, PaginationMeta, Country } from '@/types/pornstar';
@@ -10,6 +10,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 
 export default function PornstarsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pornstars, setPornstars] = useState<Pornstar[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
@@ -21,9 +22,20 @@ export default function PornstarsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'real' | 'virtual'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'pending_review' | 'draft'>('all');
   const [filterCountry, setFilterCountry] = useState<number | null>(null);
   const [modalAction, setModalAction] = useState<{ type: 'delete' | 'restore', id: string, name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Update filter status when URL params change
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam && ['active', 'inactive', 'pending_review', 'draft'].includes(statusParam)) {
+      setFilterStatus(statusParam as any);
+    } else {
+      setFilterStatus('all');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const loadCountries = async () => {
@@ -46,6 +58,7 @@ export default function PornstarsPage() {
         per_page: perPage,
         trashed: showTrashed,
         type: filterType !== 'all' ? filterType : undefined,
+        status: filterStatus !== 'all' ? filterStatus : undefined,
         country_id: filterCountry || undefined,
         query: searchQuery || undefined,
       });
@@ -65,7 +78,7 @@ export default function PornstarsPage() {
     }, 300); // Debounce search
 
     return () => clearTimeout(timer);
-  }, [perPage, showTrashed, filterType, filterCountry, searchQuery]);
+  }, [perPage, showTrashed, filterType, filterStatus, filterCountry, searchQuery]);
 
   const handleDeleteClick = (id: string, name: string) => {
     setModalAction({ type: 'delete', id, name });
@@ -164,7 +177,7 @@ export default function PornstarsPage() {
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <input
                 type="text"
@@ -184,6 +197,20 @@ export default function PornstarsPage() {
                 <option value="all">All Types</option>
                 <option value="real">Real</option>
                 <option value="virtual">Virtual</option>
+              </select>
+            </div>
+
+            <div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending_review">Pending Review</option>
+                <option value="draft">Draft</option>
               </select>
             </div>
 
@@ -216,6 +243,9 @@ export default function PornstarsPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Age
@@ -265,6 +295,19 @@ export default function PornstarsPage() {
                             : 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
                         }`}>
                           {pornstar.type}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                          pornstar.status === 'active'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : pornstar.status === 'pending_review'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                            : pornstar.status === 'inactive'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                        }`}>
+                          {pornstar.status.replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">

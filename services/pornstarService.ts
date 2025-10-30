@@ -6,6 +6,8 @@ import type {
   CreatePornstarData,
   UpdatePornstarData,
 } from '@/types/pornstar';
+import type { Asset } from '@/types/asset';
+import type { GenerateAssetFormData } from '@/components/GenerateAssetModal';
 
 class PornstarService {
   private basePath = '/pornstars';
@@ -24,6 +26,9 @@ class PornstarService {
     }
     if (filters?.type) {
       params.append('type', filters.type);
+    }
+    if (filters?.status) {
+      params.append('status', filters.status);
     }
     if (filters?.country_id) {
       params.append('country_id', filters.country_id.toString());
@@ -60,6 +65,21 @@ class PornstarService {
 
   async restore(id: string): Promise<Pornstar> {
     const response = await axiosInstance.post<{ data: Pornstar }>(`${this.basePath}/${id}/restore`);
+    return response.data.data;
+  }
+
+  async activate(id: string): Promise<Pornstar> {
+    const response = await axiosInstance.put<{ data: Pornstar }>(`${this.basePath}/${id}/activate`);
+    return response.data.data;
+  }
+
+  async getAssets(id: string): Promise<Asset[]> {
+    const response = await axiosInstance.get<{ data: Asset[] }>(`${this.basePath}/${id}/assets`);
+    return response.data.data;
+  }
+
+  async generateAsset(id: string, data: GenerateAssetFormData): Promise<Asset> {
+    const response = await axiosInstance.post<{ data: Asset }>(`${this.basePath}/${id}/assets/generate`, data);
     return response.data.data;
   }
 }

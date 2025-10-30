@@ -7,6 +7,7 @@ export interface Asset {
   is_featured: boolean;
   is_premium: boolean;
   asset_type: string;
+  status: string;
   published_at: string | null;
   metadata: Record<string, any>;
   deleted_at: string | null;

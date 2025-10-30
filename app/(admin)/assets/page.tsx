@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { assetService } from '@/services/assetService';
 import type { Asset, PaginationMeta } from '@/types/asset';
+import GenerateAssetModal, { type GenerateAssetFormData } from '@/components/GenerateAssetModal';
 
 export default function AssetsPage() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function AssetsPage() {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
+  const [showGenerateAssetModal, setShowGenerateAssetModal] = useState(false);
+  const [generatingAsset, setGeneratingAsset] = useState(false);
 
   const fetchAssets = async (page = 1) => {
     try {
@@ -57,15 +60,37 @@ export default function AssetsPage() {
     return asset.title?.en || asset.title?.[Object.keys(asset.title)[0]] || 'Untitled';
   };
 
+  const handleGenerateAsset = async (formData: GenerateAssetFormData) => {
+    setGeneratingAsset(true);
+    try {
+      await assetService.generate(formData);
+      setShowGenerateAssetModal(false);
+      // Refresh assets list
+      fetchAssets(currentPage);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to generate asset');
+    } finally {
+      setGeneratingAsset(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-          Assets Management
-        </h2>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Manage media assets and files
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+            Assets Management
+          </h2>
+          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+            Manage media assets and files
+          </p>
+        </div>
+        <button
+          onClick={() => setShowGenerateAssetModal(true)}
+          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 cursor-pointer dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Generate Asset
+        </button>
       </div>
 
       {error && (
@@ -338,6 +363,13 @@ export default function AssetsPage() {
           </>
         )}
       </div>
+
+      <GenerateAssetModal
+        isOpen={showGenerateAssetModal}
+        onClose={() => setShowGenerateAssetModal(false)}
+        onSubmit={handleGenerateAsset}
+        isLoading={generatingAsset}
+      />
     </div>
   );
 }
