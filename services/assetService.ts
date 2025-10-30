@@ -24,6 +24,12 @@ class AssetService {
     if (filters?.trashed) {
       params.append('trashed', 'true');
     }
+    if (filters?.premium !== undefined) {
+      params.append('premium', filters.premium ? 'true' : 'false');
+    }
+    if (filters?.type) {
+      params.append('type', filters.type);
+    }
 
     const queryString = params.toString();
     const url = queryString ? `${this.basePath}?${queryString}` : this.basePath;

@@ -42,4 +42,6 @@ export interface AssetFilters {
   per_page?: number;
   query?: string;
   trashed?: boolean;
+  premium?: boolean;
+  type?: string;
 }

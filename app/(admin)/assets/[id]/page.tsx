@@ -34,11 +34,55 @@ export default function AssetDetailPage() {
   };
 
   const getTitle = (asset: Asset) => {
-    return asset.title?.en || asset.title?.[Object.keys(asset.title)[0]] || 'Untitled';
+    if (!asset.title) return 'Untitled';
+
+    // Handle case where title might be a string (JSON string)
+    let titleObj = asset.title;
+    if (typeof titleObj === 'string') {
+      try {
+        titleObj = JSON.parse(titleObj);
+      } catch {
+        return titleObj; // If it's a plain string, just return it
+      }
+    }
+
+    // Try English first
+    if (titleObj.en) return titleObj.en;
+
+    // If not English, get first available translation
+    const keys = Object.keys(titleObj);
+    if (keys.length > 0) {
+      const firstKey = keys[0];
+      return titleObj[firstKey];
+    }
+
+    return 'Untitled';
   };
 
   const getDescription = (asset: Asset) => {
-    return asset.description?.en || asset.description?.[Object.keys(asset.description)[0]] || '-';
+    if (!asset.description) return '-';
+
+    // Handle case where description might be a string (JSON string)
+    let descObj = asset.description;
+    if (typeof descObj === 'string') {
+      try {
+        descObj = JSON.parse(descObj);
+      } catch {
+        return descObj; // If it's a plain string, just return it
+      }
+    }
+
+    // Try English first
+    if (descObj.en) return descObj.en;
+
+    // If not English, get first available translation
+    const keys = Object.keys(descObj);
+    if (keys.length > 0) {
+      const firstKey = keys[0];
+      return descObj[firstKey];
+    }
+
+    return '-';
   };
 
   if (loading) {
@@ -61,7 +105,7 @@ export default function AssetDetailPage() {
           </h2>
           <button
             onClick={() => router.push('/assets')}
-            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
+            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
           >
             Back to Assets
           </button>
@@ -89,7 +133,7 @@ export default function AssetDetailPage() {
         </div>
         <button
           onClick={() => router.push('/assets')}
-          className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
+          className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
         >
           Back to Assets
         </button>

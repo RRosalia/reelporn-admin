@@ -13,6 +13,8 @@ export default function AssetsPage() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTrashed, setShowTrashed] = useState(false);
+  const [premiumFilter, setPremiumFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
@@ -29,6 +31,8 @@ export default function AssetsPage() {
         per_page: perPage,
         query: searchQuery || undefined,
         trashed: showTrashed,
+        premium: premiumFilter === 'all' ? undefined : premiumFilter === 'premium',
+        type: typeFilter === 'all' ? undefined : typeFilter,
       });
 
       setAssets(response.data || []);
@@ -49,7 +53,7 @@ export default function AssetsPage() {
     }, 300); // Debounce search
 
     return () => clearTimeout(timer);
-  }, [perPage, searchQuery, showTrashed]);
+  }, [perPage, searchQuery, showTrashed, premiumFilter, typeFilter]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -57,7 +61,29 @@ export default function AssetsPage() {
   };
 
   const getTitle = (asset: Asset) => {
-    return asset.title?.en || asset.title?.[Object.keys(asset.title)[0]] || 'Untitled';
+    if (!asset.title) return 'Untitled';
+
+    // Handle case where title might be a string (JSON string)
+    let titleObj = asset.title;
+    if (typeof titleObj === 'string') {
+      try {
+        titleObj = JSON.parse(titleObj);
+      } catch {
+        return titleObj; // If it's a plain string, just return it
+      }
+    }
+
+    // Try English first
+    if (titleObj.en) return titleObj.en;
+
+    // If not English, get first available translation
+    const keys = Object.keys(titleObj);
+    if (keys.length > 0) {
+      const firstKey = keys[0];
+      return titleObj[firstKey];
+    }
+
+    return 'Untitled';
   };
 
   const handleGenerateAsset = async (formData: GenerateAssetFormData) => {
@@ -117,15 +143,33 @@ export default function AssetsPage() {
 
       <div className="rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
         <div className="p-6 border-b border-zinc-200 dark:border-zinc-700">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4">
             <input
               type="text"
               placeholder="Search by title, slug..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 dark:placeholder-zinc-500"
+              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 dark:placeholder-zinc-500"
             />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={premiumFilter}
+                onChange={(e) => setPremiumFilter(e.target.value)}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+              >
+                <option value="all">All Assets</option>
+                <option value="premium">Premium Only</option>
+                <option value="free">Free Only</option>
+              </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+              >
+                <option value="all">All Types</option>
+                <option value="video">Video</option>
+                <option value="image">Image</option>
+              </select>
               <label className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer">
                 <input
                   type="checkbox"
@@ -185,9 +229,6 @@ export default function AssetsPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Published
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                      Trashed
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Created
@@ -254,15 +295,6 @@ export default function AssetsPage() {
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
                         {asset.published_at ? new Date(asset.published_at).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm">
-                        {asset.deleted_at ? (
-                          <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 dark:bg-red-900/20 dark:text-red-400">
-                            Deleted
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400 dark:text-zinc-600">-</span>
-                        )}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
                         {new Date(asset.created_at).toLocaleDateString()}
