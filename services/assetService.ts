@@ -47,6 +47,11 @@ class AssetService {
     const response = await axiosInstance.post<{ data: Asset }>(`${this.basePath}/generate`, data);
     return response.data.data;
   }
+
+  async getImageModels(): Promise<Array<{ value: string; label: string }>> {
+    const response = await axiosInstance.get<{ data: Array<{ value: string; label: string }> }>(`${this.basePath}/models/image`);
+    return response.data.data;
+  }
 }
 
 export const assetService = new AssetService();

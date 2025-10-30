@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { assetService } from '@/services/assetService';
 
 interface GenerateAssetModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export interface GenerateAssetFormData {
   description?: string;
   prompt: string;
   negative_prompt?: string;
+  image_model?: string;
   duration_seconds?: number;
   guidance_scale?: number;
   num_inference_steps?: number;
@@ -32,12 +34,15 @@ export default function GenerateAssetModal({
     description: '',
     prompt: '',
     negative_prompt: '',
+    image_model: '',
     duration_seconds: 5,
     guidance_scale: 7.5,
     num_inference_steps: 50,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [imageModels, setImageModels] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,13 +52,31 @@ export default function GenerateAssetModal({
         description: '',
         prompt: '',
         negative_prompt: '',
+        image_model: '',
         duration_seconds: 5,
         guidance_scale: 7.5,
         num_inference_steps: 50,
       });
       setErrors({});
+      fetchImageModels();
     }
   }, [isOpen]);
+
+  const fetchImageModels = async () => {
+    try {
+      setLoadingModels(true);
+      const models = await assetService.getImageModels();
+      setImageModels(models);
+      // Set first model as default
+      if (models.length > 0) {
+        setFormData(prev => ({ ...prev, image_model: models[0].value }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch image models:', err);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   const handleAssetTypeChange = (asset_type: 'image' | 'video') => {
     setFormData({
@@ -74,6 +97,10 @@ export default function GenerateAssetModal({
 
     if (!formData.prompt) {
       newErrors.prompt = 'Prompt is required';
+    }
+
+    if (formData.asset_type === 'image' && !formData.image_model) {
+      newErrors.image_model = 'Image model is required';
     }
 
     if (formData.asset_type === 'video' && (!formData.duration_seconds || formData.duration_seconds <= 0)) {
@@ -205,6 +232,34 @@ export default function GenerateAssetModal({
               placeholder="Enter negative prompt (optional)"
             />
           </div>
+
+          {/* Image Model - only for image type */}
+          {formData.asset_type === 'image' && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Image Model *
+              </label>
+              <select
+                value={formData.image_model}
+                onChange={(e) => setFormData({ ...formData, image_model: e.target.value })}
+                disabled={isLoading || loadingModels}
+                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <option value="">Select a model...</option>
+                {imageModels.map((model) => (
+                  <option key={model.value} value={model.value}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+              {loadingModels && (
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Loading models...</p>
+              )}
+              {errors.image_model && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.image_model}</p>
+              )}
+            </div>
+          )}
 
           {/* Video-specific fields */}
           {formData.asset_type === 'video' && (

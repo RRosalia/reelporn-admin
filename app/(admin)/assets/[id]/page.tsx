@@ -13,6 +13,7 @@ export default function AssetDetailPage() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showMediaModal, setShowMediaModal] = useState(false);
 
   useEffect(() => {
     fetchAsset();
@@ -157,20 +158,46 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {asset.thumbnail_url && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-            Thumbnail
-          </h3>
-          <img
-            src={asset.thumbnail_url}
-            alt={getTitle(asset)}
-            className="max-w-md rounded-lg"
-          />
+      {/* Two column layout: Media on left, Information on right */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left column: Media */}
+        <div>
+          <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+              Media
+            </h3>
+            {asset.thumbnail_url ? (
+              <div
+                onClick={() => setShowMediaModal(true)}
+                className="cursor-pointer group relative"
+              >
+                <img
+                  src={asset.thumbnail_url}
+                  alt={getTitle(asset)}
+                  className="w-full rounded-lg transition-opacity group-hover:opacity-90"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
+                  <svg className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full h-64 bg-zinc-100 dark:bg-zinc-700 rounded-lg">
+                <div className="text-center">
+                  <svg className="mx-auto h-12 w-12 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">No media available</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
 
-      <div className="rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
+        {/* Right column: Asset Information */}
+        <div>
+          <div className="rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
         <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-700">
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Asset Information
@@ -254,6 +281,23 @@ export default function AssetDetailPage() {
 
             <div>
               <dt className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                Status
+              </dt>
+              <dd className="mt-1">
+                <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                  asset.status === 'published'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                    : asset.status === 'draft'
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                }`}>
+                  {asset.status}
+                </span>
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                 Published At
               </dt>
               <dd className="mt-1 text-sm text-zinc-900 dark:text-zinc-50">
@@ -270,6 +314,8 @@ export default function AssetDetailPage() {
               </dd>
             </div>
           </dl>
+        </div>
+          </div>
         </div>
       </div>
 
@@ -325,6 +371,31 @@ export default function AssetDetailPage() {
           </dl>
         </div>
       </div>
+
+      {/* Media Enlargement Modal */}
+      {showMediaModal && asset.thumbnail_url && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setShowMediaModal(false)}
+        >
+          <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            <button
+              onClick={() => setShowMediaModal(false)}
+              className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors cursor-pointer"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={asset.thumbnail_url}
+              alt={getTitle(asset)}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
