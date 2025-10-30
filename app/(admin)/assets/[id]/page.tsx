@@ -226,7 +226,7 @@ export default function AssetDetailPage() {
           </h3>
         </div>
         <div className="p-6">
-          <pre className="text-sm text-zinc-900 dark:text-zinc-50 bg-zinc-50 dark:bg-zinc-900 p-4 rounded overflow-auto">
+          <pre className="text-sm text-zinc-900 dark:text-zinc-50 bg-zinc-50 dark:bg-zinc-900 p-4 rounded overflow-x-auto max-w-full whitespace-pre-wrap break-words">
             {JSON.stringify(asset.metadata, null, 2)}
           </pre>
         </div>
