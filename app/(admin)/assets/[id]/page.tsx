@@ -33,53 +33,63 @@ export default function AssetDetailPage() {
     }
   };
 
-  const getTitle = (asset: Asset) => {
+  const getTitle = (asset: Asset): string => {
     if (!asset.title) return 'Untitled';
 
     // Handle case where title might be a string (JSON string)
-    let titleObj = asset.title;
-    if (typeof titleObj === 'string') {
+    const titleValue = asset.title;
+    if (typeof titleValue === 'string') {
       try {
-        titleObj = JSON.parse(titleObj);
+        const parsed = JSON.parse(titleValue) as Record<string, string>;
+        // Try English first
+        if (parsed.en) return parsed.en;
+        // Get first available translation
+        const keys = Object.keys(parsed);
+        if (keys.length > 0) return parsed[keys[0]];
+        return 'Untitled';
       } catch {
-        return titleObj; // If it's a plain string, just return it
+        return titleValue; // If it's a plain string, just return it
       }
     }
 
-    // Try English first
-    if (titleObj.en) return titleObj.en;
-
-    // If not English, get first available translation
-    const keys = Object.keys(titleObj);
-    if (keys.length > 0) {
-      const firstKey = keys[0];
-      return titleObj[firstKey];
+    // If titleValue is an object
+    if (typeof titleValue === 'object' && titleValue !== null) {
+      // Try English first
+      if (titleValue.en) return titleValue.en;
+      // Get first available translation
+      const keys = Object.keys(titleValue);
+      if (keys.length > 0) return titleValue[keys[0]];
     }
 
     return 'Untitled';
   };
 
-  const getDescription = (asset: Asset) => {
+  const getDescription = (asset: Asset): string => {
     if (!asset.description) return '-';
 
     // Handle case where description might be a string (JSON string)
-    let descObj = asset.description;
-    if (typeof descObj === 'string') {
+    const descValue = asset.description;
+    if (typeof descValue === 'string') {
       try {
-        descObj = JSON.parse(descObj);
+        const parsed = JSON.parse(descValue) as Record<string, string>;
+        // Try English first
+        if (parsed.en) return parsed.en;
+        // Get first available translation
+        const keys = Object.keys(parsed);
+        if (keys.length > 0) return parsed[keys[0]];
+        return '-';
       } catch {
-        return descObj; // If it's a plain string, just return it
+        return descValue; // If it's a plain string, just return it
       }
     }
 
-    // Try English first
-    if (descObj.en) return descObj.en;
-
-    // If not English, get first available translation
-    const keys = Object.keys(descObj);
-    if (keys.length > 0) {
-      const firstKey = keys[0];
-      return descObj[firstKey];
+    // If descValue is an object
+    if (typeof descValue === 'object' && descValue !== null) {
+      // Try English first
+      if (descValue.en) return descValue.en;
+      // Get first available translation
+      const keys = Object.keys(descValue);
+      if (keys.length > 0) return descValue[keys[0]];
     }
 
     return '-';
