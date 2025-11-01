@@ -29,7 +29,13 @@ export default function DashboardLayout({
       ]
     },
     { name: 'Categories', href: '/categories' },
-    { name: 'Assets', href: '/assets' },
+    {
+      name: 'Assets',
+      href: '/assets',
+      subItems: [
+        { name: 'Pending Review', href: '/assets?status=ready_for_review' }
+      ]
+    },
     { name: 'Plans', href: '/plans' },
     { name: 'Affiliates', href: '/affiliates' },
     { name: 'Payments', href: '/payments' },

@@ -30,6 +30,9 @@ class AssetService {
     if (filters?.type) {
       params.append('type', filters.type);
     }
+    if (filters?.status) {
+      params.append('status', filters.status);
+    }
 
     const queryString = params.toString();
     const url = queryString ? `${this.basePath}?${queryString}` : this.basePath;

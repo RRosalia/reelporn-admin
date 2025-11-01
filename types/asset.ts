@@ -62,4 +62,5 @@ export interface AssetFilters {
   trashed?: boolean;
   premium?: boolean;
   type?: string;
+  status?: string;
 }

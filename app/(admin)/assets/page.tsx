@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { assetService } from '@/services/assetService';
 import type { Asset, PaginationMeta } from '@/types/asset';
 import GenerateAssetModal, { type GenerateAssetFormData } from '@/components/GenerateAssetModal';
 
 export default function AssetsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,11 +16,22 @@ export default function AssetsPage() {
   const [showTrashed, setShowTrashed] = useState(false);
   const [premiumFilter, setPremiumFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
   const [showGenerateAssetModal, setShowGenerateAssetModal] = useState(false);
   const [generatingAsset, setGeneratingAsset] = useState(false);
+
+  // Update filter status when URL params change
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam && ['published', 'draft', 'ready_for_review', 'processing'].includes(statusParam)) {
+      setStatusFilter(statusParam);
+    } else if (!statusParam) {
+      setStatusFilter('all');
+    }
+  }, [searchParams]);
 
   const fetchAssets = async (page = 1) => {
     try {
@@ -33,6 +45,7 @@ export default function AssetsPage() {
         trashed: showTrashed,
         premium: premiumFilter === 'all' ? undefined : premiumFilter === 'premium',
         type: typeFilter === 'all' ? undefined : typeFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
       });
 
       setAssets(response.data || []);
@@ -53,7 +66,7 @@ export default function AssetsPage() {
     }, 300); // Debounce search
 
     return () => clearTimeout(timer);
-  }, [perPage, searchQuery, showTrashed, premiumFilter, typeFilter]);
+  }, [perPage, searchQuery, showTrashed, premiumFilter, typeFilter, statusFilter]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -169,11 +182,22 @@ export default function AssetsPage() {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer"
               >
                 <option value="all">All Types</option>
                 <option value="video">Video</option>
                 <option value="image">Image</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="ready_for_review">Ready for Review</option>
+                <option value="processing">Processing</option>
               </select>
               <label className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer">
                 <input
@@ -231,6 +255,9 @@ export default function AssetsPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Premium
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
                       Published
@@ -297,6 +324,19 @@ export default function AssetsPage() {
                             Free
                           </span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                          asset.status === 'published'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : asset.status === 'draft'
+                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                            : asset.status === 'ready_for_review'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
+                        }`}>
+                          {asset.status === 'ready_for_review' ? 'Ready for Review' : asset.status.charAt(0).toUpperCase() + asset.status.slice(1)}
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
                         {asset.published_at ? new Date(asset.published_at).toLocaleDateString() : '-'}
