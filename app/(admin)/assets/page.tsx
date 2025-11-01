@@ -17,18 +17,32 @@ export default function AssetsPage() {
   const [premiumFilter, setPremiumFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statuses, setStatuses] = useState<Array<{ value: string; label: string }>>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
   const [showGenerateAssetModal, setShowGenerateAssetModal] = useState(false);
   const [generatingAsset, setGeneratingAsset] = useState(false);
 
+  // Fetch available statuses on mount
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const statusesData = await assetService.getStatuses();
+        setStatuses(statusesData);
+      } catch (err) {
+        console.error('Failed to fetch statuses:', err);
+      }
+    };
+    fetchStatuses();
+  }, []);
+
   // Update filter status when URL params change
   useEffect(() => {
     const statusParam = searchParams.get('status');
-    if (statusParam && ['published', 'draft', 'ready_for_review', 'processing'].includes(statusParam)) {
+    if (statusParam) {
       setStatusFilter(statusParam);
-    } else if (!statusParam) {
+    } else {
       setStatusFilter('all');
     }
   }, [searchParams]);
@@ -71,6 +85,24 @@ export default function AssetsPage() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     fetchAssets(page);
+  };
+
+  const getStatusLabel = (statusValue: string): string => {
+    const status = statuses.find(s => s.value === statusValue);
+    return status ? status.label : statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
+  };
+
+  const getStatusColor = (statusValue: string): string => {
+    switch (statusValue) {
+      case 'active':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'ready_for_review':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'generation_requested':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
   };
 
   const getTitle = (asset: Asset): string => {
@@ -194,10 +226,11 @@ export default function AssetsPage() {
                 className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer"
               >
                 <option value="all">All Statuses</option>
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-                <option value="ready_for_review">Ready for Review</option>
-                <option value="processing">Processing</option>
+                {statuses.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
               </select>
               <label className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer">
                 <input
@@ -326,16 +359,8 @@ export default function AssetsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                          asset.status === 'published'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : asset.status === 'draft'
-                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                            : asset.status === 'ready_for_review'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
-                        }`}>
-                          {asset.status === 'ready_for_review' ? 'Ready for Review' : asset.status.charAt(0).toUpperCase() + asset.status.slice(1)}
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(asset.status)}`}>
+                          {getStatusLabel(asset.status)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">

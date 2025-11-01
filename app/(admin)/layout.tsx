@@ -33,13 +33,15 @@ export default function DashboardLayout({
       name: 'Assets',
       href: '/assets',
       subItems: [
-        { name: 'Pending Review', href: '/assets?status=ready_for_review' }
+        { name: 'Pending Review', href: '/assets?status=ready_for_review' },
+        { name: 'Generation Requested', href: '/assets?status=generation_requested' }
       ]
     },
     { name: 'Plans', href: '/plans' },
     { name: 'Affiliates', href: '/affiliates' },
     { name: 'Payments', href: '/payments' },
     { name: 'Subscriptions', href: '/subscriptions' },
+    { name: 'GPUs', href: '/gpus' },
     { name: 'IP Whitelist', href: '/ips' },
   ];
 
