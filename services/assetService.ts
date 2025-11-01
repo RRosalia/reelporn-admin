@@ -37,6 +37,9 @@ class AssetService {
       params.append('pornstar_id', filters.pornstar_id);
     }
 
+    // Eager load media relationship
+    params.append('with[]', 'media');
+
     const queryString = params.toString();
     const url = queryString ? `${this.basePath}?${queryString}` : this.basePath;
 

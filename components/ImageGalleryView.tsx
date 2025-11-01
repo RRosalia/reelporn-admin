@@ -111,17 +111,17 @@ export default function ImageGalleryView({
           >
             {/* Asset Preview */}
             <div className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
-              {asset.media_url ? (
+              {asset.media?.url ? (
                 asset.asset_type === 'video' ? (
                   <video
-                    src={asset.media_url}
+                    src={asset.media.url}
                     className="w-full h-full object-cover"
                     muted
                     playsInline
                   />
                 ) : (
                   <img
-                    src={asset.media_url}
+                    src={asset.media.url}
                     alt={getTitle(asset)}
                     className="w-full h-full object-cover"
                   />
