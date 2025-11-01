@@ -78,6 +78,7 @@ export default function AssetsPage() {
         premium: premiumFilter === 'all' ? undefined : premiumFilter === 'premium',
         type: typeFilter === 'all' ? undefined : typeFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        withMedia: viewMode === 'gallery', // Only load media for gallery view
       });
 
       setAssets(response.data || []);
@@ -98,7 +99,7 @@ export default function AssetsPage() {
     }, 300); // Debounce search
 
     return () => clearTimeout(timer);
-  }, [perPage, searchQuery, showTrashed, premiumFilter, typeFilter, statusFilter]);
+  }, [perPage, searchQuery, showTrashed, premiumFilter, typeFilter, statusFilter, viewMode]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -119,6 +120,7 @@ export default function AssetsPage() {
         premium: premiumFilter === 'all' ? undefined : premiumFilter === 'premium',
         type: typeFilter === 'all' ? undefined : typeFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        withMedia: viewMode === 'gallery', // Only load media for gallery view
       });
 
       // Deduplicate assets by ID before appending
