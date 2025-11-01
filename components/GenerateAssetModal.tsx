@@ -152,11 +152,24 @@ export default function GenerateAssetModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent submission if not on final step
+    if (currentStep !== totalSteps) {
+      return;
+    }
+
     if (!validateStep(4)) {
       return;
     }
 
     await onSubmit(formData);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    // Prevent Enter key from submitting form on intermediate steps
+    if (e.key === 'Enter' && currentStep !== totalSteps && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      handleNext();
+    }
   };
 
   if (!isOpen) return null;
@@ -224,7 +237,7 @@ export default function GenerateAssetModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
           {/* Step 1: Asset Type Selection */}
           {currentStep === 1 && (
             <div className="space-y-4">
