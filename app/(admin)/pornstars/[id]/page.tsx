@@ -102,7 +102,8 @@ export default function ViewPornstarPage() {
       const assetsData = await pornstarService.getAssets(id);
       setAssets(assetsData);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to generate asset');
+      // Re-throw the error so the modal can catch and display it
+      throw err;
     } finally {
       setGeneratingAsset(false);
     }
@@ -520,6 +521,8 @@ export default function ViewPornstarPage() {
           onClose={() => setShowGenerateAssetModal(false)}
           onSubmit={handleGenerateAsset}
           isLoading={generatingAsset}
+          characterId={pornstar?.id}
+          readOnlyCharacter={true}
         />
       </div>
     </ProtectedRoute>

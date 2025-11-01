@@ -63,6 +63,10 @@ class AssetService {
     const response = await axiosInstance.get<{ data: Array<{ value: string; label: string }> }>(`${this.basePath}/statuses`);
     return response.data.data;
   }
+
+  async delete(id: string): Promise<void> {
+    await axiosInstance.delete(`${this.basePath}/${id}`);
+  }
 }
 
 export const assetService = new AssetService();

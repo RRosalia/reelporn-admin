@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { assetService } from '@/services/assetService';
+import ConfirmModal from '@/components/ConfirmModal';
 import type { Asset } from '@/types/asset';
 
 export default function AssetDetailPage() {
@@ -14,6 +15,8 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showMediaModal, setShowMediaModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAsset();
@@ -96,6 +99,22 @@ export default function AssetDetailPage() {
     return '-';
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    try {
+      await assetService.delete(assetId);
+      router.push('/assets');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete asset');
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -142,12 +161,23 @@ export default function AssetDetailPage() {
             Asset Details
           </p>
         </div>
-        <button
-          onClick={() => router.push('/assets')}
-          className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
-        >
-          Back to Assets
-        </button>
+        <div className="flex items-center gap-3">
+          {!asset.deleted_at && (
+            <button
+              onClick={handleDeleteClick}
+              disabled={deleting}
+              className="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer dark:border-red-600 dark:bg-zinc-800 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              Delete Asset
+            </button>
+          )}
+          <button
+            onClick={() => router.push('/assets')}
+            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+          >
+            Back to Assets
+          </button>
+        </div>
       </div>
 
       {asset.deleted_at && (
@@ -401,6 +431,19 @@ export default function AssetDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Asset"
+        message={`Are you sure you want to delete "${getTitle(asset)}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

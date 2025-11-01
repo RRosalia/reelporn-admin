@@ -3,14 +3,18 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { assetService } from '@/services/assetService';
+import { pornstarService } from '@/services/pornstarService';
 import MediaLibrarySelector from './MediaLibrarySelector';
 import type { Asset } from '@/types/asset';
+import type { Pornstar } from '@/types/pornstar';
 
 interface GenerateAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: GenerateAssetFormData) => Promise<void>;
   isLoading?: boolean;
+  characterId?: string; // Pre-select a character (from pornstar page)
+  readOnlyCharacter?: boolean; // Prevent changing character when set from pornstar page
 }
 
 export interface GenerateAssetFormData {
@@ -21,6 +25,7 @@ export interface GenerateAssetFormData {
   negative_prompt?: string;
   image_model?: string;
   reference_asset_id?: string;
+  character_id?: string;
   // Image quality settings
   width?: number;
   height?: number;
@@ -45,6 +50,8 @@ export default function GenerateAssetModal({
   onClose,
   onSubmit,
   isLoading = false,
+  characterId,
+  readOnlyCharacter = false,
 }: GenerateAssetModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<GenerateAssetFormData>({
@@ -75,6 +82,9 @@ export default function GenerateAssetModal({
   const [canSubmit, setCanSubmit] = useState(false);
   const [useReferenceImage, setUseReferenceImage] = useState(false);
   const [selectedReferenceAsset, setSelectedReferenceAsset] = useState<Asset | null>(null);
+  const [pornstars, setPornstars] = useState<Pornstar[]>([]);
+  const [loadingPornstars, setLoadingPornstars] = useState(false);
+  const [pornstarSearchQuery, setPornstarSearchQuery] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -86,6 +96,7 @@ export default function GenerateAssetModal({
         prompt: '',
         negative_prompt: '',
         image_model: '',
+        character_id: characterId || '', // Set character if provided
         // Image quality defaults
         width: 1024,
         height: 1024,
@@ -104,9 +115,11 @@ export default function GenerateAssetModal({
       setCanSubmit(false);
       setUseReferenceImage(false);
       setSelectedReferenceAsset(null);
+      setPornstarSearchQuery('');
       fetchImageModels();
+      fetchPornstars();
     }
-  }, [isOpen]);
+  }, [isOpen, characterId]);
 
   const fetchImageModels = async () => {
     try {
@@ -120,6 +133,31 @@ export default function GenerateAssetModal({
       setLoadingModels(false);
     }
   };
+
+  const fetchPornstars = async () => {
+    try {
+      setLoadingPornstars(true);
+      const response = await pornstarService.getAll({
+        per_page: 100,
+        status: 'active',
+        query: pornstarSearchQuery || undefined,
+      });
+      setPornstars(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pornstars:', err);
+    } finally {
+      setLoadingPornstars(false);
+    }
+  };
+
+  // Fetch pornstars when search query changes (with debounce)
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      fetchPornstars();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pornstarSearchQuery, isOpen]);
 
   // Update selected model when image_model changes
   useEffect(() => {
@@ -511,6 +549,60 @@ export default function GenerateAssetModal({
                 </div>
               )}
 
+              {/* Character Selection */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Character (Optional)
+                  {readOnlyCharacter && characterId && (
+                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">(Set from character page)</span>
+                  )}
+                </label>
+                {readOnlyCharacter && characterId ? (
+                  <div className="w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-300">
+                    {pornstars.find(p => p.id === formData.character_id)
+                      ? `${pornstars.find(p => p.id === formData.character_id)?.first_name || ''} ${pornstars.find(p => p.id === formData.character_id)?.last_name || ''}`.trim()
+                      : 'Loading character...'}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search for a character..."
+                      value={pornstarSearchQuery}
+                      onChange={(e) => setPornstarSearchQuery(e.target.value)}
+                      disabled={isLoading}
+                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 mb-2"
+                    />
+                    <div className="relative">
+                      <select
+                        value={formData.character_id}
+                        onChange={(e) => setFormData({ ...formData, character_id: e.target.value })}
+                        disabled={isLoading || loadingPornstars}
+                        className="w-full appearance-none rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="">No character</option>
+                        {pornstars.map((pornstar) => (
+                          <option key={pornstar.id} value={pornstar.id}>
+                            {`${pornstar.first_name || ''} ${pornstar.last_name || ''}`.trim() || 'Unnamed'}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                        </svg>
+                      </div>
+                    </div>
+                    {loadingPornstars && (
+                      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Loading characters...</p>
+                    )}
+                  </>
+                )}
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  Associate this asset with a specific character/pornstar
+                </p>
+              </div>
+
               {/* Prompt */}
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
@@ -552,27 +644,53 @@ export default function GenerateAssetModal({
               {/* Reference Image - For both images and videos */}
               {(formData.asset_type === 'image' || formData.asset_type === 'video') && (
                 <div>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useReferenceImage}
-                      onChange={(e) => {
-                        setUseReferenceImage(e.target.checked);
-                        if (!e.target.checked) {
-                          setSelectedReferenceAsset(null);
-                          setFormData({ ...formData, reference_asset_id: undefined });
-                        }
-                      }}
-                      disabled={isLoading}
-                      className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700"
-                    />
-                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      Use Reference Image
-                    </span>
-                  </label>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Select an existing asset to use as reference for the generation
-                  </p>
+                  <h3 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    Reference Image (Optional)
+                  </h3>
+                  <ul className="grid w-full gap-4">
+                    <li>
+                      <input
+                        type="checkbox"
+                        id="reference-image-option"
+                        checked={useReferenceImage}
+                        onChange={(e) => {
+                          setUseReferenceImage(e.target.checked);
+                          if (!e.target.checked) {
+                            setSelectedReferenceAsset(null);
+                            setFormData({ ...formData, reference_asset_id: undefined });
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="hidden peer"
+                      />
+                      <label
+                        htmlFor="reference-image-option"
+                        className="inline-flex items-center justify-between w-full p-4 text-zinc-500 bg-white border-2 border-zinc-200 rounded-lg cursor-pointer dark:hover:text-zinc-300 dark:border-zinc-700 peer-checked:border-blue-600 dark:peer-checked:border-blue-600 hover:text-zinc-600 dark:peer-checked:text-zinc-300 peer-checked:text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                      >
+                        <div className="block w-full">
+                          <div className="flex items-center gap-3 mb-2">
+                            <svg
+                              className="w-6 h-6 text-blue-500"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <div className="w-full text-base font-semibold">Use Reference Image</div>
+                          </div>
+                          <div className="w-full text-sm text-zinc-500 dark:text-zinc-400">
+                            Select an existing asset to use as reference for image-to-image generation
+                          </div>
+                        </div>
+                      </label>
+                    </li>
+                  </ul>
 
                   {/* Selected reference asset preview */}
                   {useReferenceImage && selectedReferenceAsset && (

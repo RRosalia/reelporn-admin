@@ -126,12 +126,8 @@ export default function MediaLibrarySelector({
   };
 
   const getPornstarName = (pornstar: Pornstar): string => {
-    if (pornstar.stage_name) return pornstar.stage_name;
-    if (typeof pornstar.name === 'string') return pornstar.name;
-    if (typeof pornstar.name === 'object' && pornstar.name !== null) {
-      return pornstar.name.en || Object.values(pornstar.name)[0] || 'Unnamed';
-    }
-    return 'Unnamed';
+    const fullName = `${pornstar.first_name || ''} ${pornstar.last_name || ''}`.trim();
+    return fullName || 'Unnamed';
   };
 
   return (
