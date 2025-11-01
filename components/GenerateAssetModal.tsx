@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { assetService } from '@/services/assetService';
+import MediaLibrarySelector from './MediaLibrarySelector';
+import type { Asset } from '@/types/asset';
 
 interface GenerateAssetModalProps {
   isOpen: boolean;
@@ -17,7 +20,16 @@ export interface GenerateAssetFormData {
   prompt: string;
   negative_prompt?: string;
   image_model?: string;
-  duration_seconds?: number;
+  reference_asset_id?: string;
+  // Image quality settings
+  width?: number;
+  height?: number;
+  aspect_ratio?: string; // 'landscape', 'portrait', 'square', '16:9', 'custom'
+  // Video quality settings
+  video_resolution?: string; // e.g., "1280x720"
+  duration_seconds?: number; // 1-15 seconds
+  fps?: number; // Default 24
+  // Advanced settings
   guidance_scale?: number;
   num_inference_steps?: number;
 }
@@ -42,15 +54,27 @@ export default function GenerateAssetModal({
     prompt: '',
     negative_prompt: '',
     image_model: '',
-    duration_seconds: 5,
-    guidance_scale: 7.5,
-    num_inference_steps: 50,
+    // Image quality defaults
+    width: 1024,
+    height: 1024,
+    aspect_ratio: 'square',
+    // Video quality defaults
+    video_resolution: '1280x720', // HD
+    duration_seconds: 5, // 5 seconds default
+    fps: 24,
+    // Advanced defaults
+    guidance_scale: 3.0,
+    num_inference_steps: 30,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string>('');
   const [imageModels, setImageModels] = useState<ImageModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ImageModel | null>(null);
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [useReferenceImage, setUseReferenceImage] = useState(false);
+  const [selectedReferenceAsset, setSelectedReferenceAsset] = useState<Asset | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,12 +86,24 @@ export default function GenerateAssetModal({
         prompt: '',
         negative_prompt: '',
         image_model: '',
+        // Image quality defaults
+        width: 1024,
+        height: 1024,
+        aspect_ratio: 'square',
+        // Video quality defaults
+        video_resolution: '1280x720',
         duration_seconds: 5,
-        guidance_scale: 7.5,
-        num_inference_steps: 50,
+        fps: 24,
+        // Advanced defaults
+        guidance_scale: 3.0,
+        num_inference_steps: 30,
       });
       setErrors({});
+      setSubmitError('');
       setSelectedModel(null);
+      setCanSubmit(false);
+      setUseReferenceImage(false);
+      setSelectedReferenceAsset(null);
       fetchImageModels();
     }
   }, [isOpen]);
@@ -107,6 +143,35 @@ export default function GenerateAssetModal({
     }
   };
 
+  const handleAspectRatioChange = (ratio: string) => {
+    let width = formData.width || 1024;
+    let height = formData.height || 1024;
+
+    switch (ratio) {
+      case 'square': // 1:1
+        width = 1024;
+        height = 1024;
+        break;
+      case 'landscape': // 4:3
+        width = 1024;
+        height = 768;
+        break;
+      case 'portrait': // 3:4
+        width = 768;
+        height = 1024;
+        break;
+      case '16:9':
+        width = 1024;
+        height = 576;
+        break;
+      case 'custom':
+        // Keep current values
+        break;
+    }
+
+    setFormData({ ...formData, aspect_ratio: ratio, width, height });
+  };
+
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -129,8 +194,25 @@ export default function GenerateAssetModal({
       if (!formData.prompt) {
         newErrors.prompt = 'Prompt is required';
       }
-      if (formData.asset_type === 'video' && (!formData.duration_seconds || formData.duration_seconds <= 0)) {
-        newErrors.duration_seconds = 'Duration must be greater than 0';
+    }
+
+    if (step === 4) {
+      // Quality settings validation
+      if (formData.asset_type === 'image') {
+        if (!formData.width || formData.width <= 0) {
+          newErrors.width = 'Width must be greater than 0';
+        }
+        if (!formData.height || formData.height <= 0) {
+          newErrors.height = 'Height must be greater than 0';
+        }
+      }
+      if (formData.asset_type === 'video') {
+        if (!formData.duration_seconds || formData.duration_seconds < 1 || formData.duration_seconds > 15) {
+          newErrors.duration_seconds = 'Duration must be between 1 and 15 seconds';
+        }
+        if (!formData.fps || formData.fps <= 0) {
+          newErrors.fps = 'FPS must be greater than 0';
+        }
       }
     }
 
@@ -139,8 +221,18 @@ export default function GenerateAssetModal({
   };
 
   const handleNext = () => {
+    console.log('[GenerateAssetModal] handleNext called, currentStep:', currentStep, 'totalSteps:', totalSteps);
     if (validateStep(currentStep)) {
+      console.log('[GenerateAssetModal] Validation passed, advancing to step:', currentStep + 1);
+      setCanSubmit(false); // Disable submission when advancing
       setCurrentStep(currentStep + 1);
+
+      // Re-enable submission after a short delay to prevent immediate submission
+      setTimeout(() => {
+        setCanSubmit(true);
+      }, 100);
+    } else {
+      console.log('[GenerateAssetModal] Validation failed for step:', currentStep, 'errors:', errors);
     }
   };
 
@@ -151,34 +243,64 @@ export default function GenerateAssetModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    console.log('[GenerateAssetModal] handleSubmit called, currentStep:', currentStep, 'totalSteps:', totalSteps, 'canSubmit:', canSubmit);
 
-    // Prevent submission if not on final step
+    // CRITICAL: Prevent submission if not on final step
     if (currentStep !== totalSteps) {
+      console.error('[GenerateAssetModal] BLOCKING SUBMISSION - not on final step! currentStep:', currentStep, 'totalSteps:', totalSteps);
       return;
     }
 
-    if (!validateStep(4)) {
+    // CRITICAL: Prevent immediate submission after step change
+    if (!canSubmit) {
+      console.error('[GenerateAssetModal] BLOCKING SUBMISSION - canSubmit is false (too soon after step change)');
       return;
     }
 
-    await onSubmit(formData);
+    if (!validateStep(totalSteps)) {
+      console.log('[GenerateAssetModal] Validation failed on final step');
+      return;
+    }
+
+    console.log('[GenerateAssetModal] Submitting form data:', formData);
+
+    // Clear previous errors
+    setSubmitError('');
+
+    try {
+      await onSubmit(formData);
+    } catch (err: any) {
+      console.error('[GenerateAssetModal] Submission error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to generate asset';
+      setSubmitError(errorMessage);
+    }
   };
+
+  const totalSteps = 5;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     // Prevent Enter key from submitting form on intermediate steps
-    if (e.key === 'Enter' && currentStep !== totalSteps && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+    if (e.key === 'Enter' && currentStep !== totalSteps) {
+      const target = e.target as HTMLElement;
+      // Only allow Enter in textareas for line breaks
+      if (target.tagName === 'TEXTAREA') {
+        return; // Let textarea handle Enter normally
+      }
+      // For all other elements (input, select, etc.), prevent form submission
       e.preventDefault();
-      handleNext();
+      // Don't advance to next step, just prevent submission
+      // User must click the Next button explicitly
     }
   };
 
   if (!isOpen) return null;
 
-  const totalSteps = 4;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-800">
+      <div className={`relative w-full ${useReferenceImage ? 'max-w-6xl' : 'max-w-2xl'} max-h-[90vh] rounded-lg bg-white shadow-xl dark:bg-zinc-800 flex`}>
+        {/* Main Form Content */}
+        <div className={`${useReferenceImage ? 'w-1/2 border-r border-zinc-200 dark:border-zinc-700' : 'w-full'} overflow-y-auto p-6`}>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -203,10 +325,10 @@ export default function GenerateAssetModal({
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex justify-between mb-2">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <div
                 key={step}
-                className={`flex items-center ${step < 4 ? 'flex-1' : ''}`}
+                className={`flex items-center ${step < 5 ? 'flex-1' : ''}`}
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
@@ -217,7 +339,7 @@ export default function GenerateAssetModal({
                 >
                   {step}
                 </div>
-                {step < 4 && (
+                {step < 5 && (
                   <div
                     className={`mx-2 h-1 flex-1 rounded ${
                       step < currentStep
@@ -233,6 +355,7 @@ export default function GenerateAssetModal({
             <span>Type</span>
             <span>Details</span>
             <span>Prompts</span>
+            <span>Quality</span>
             <span>Advanced</span>
           </div>
         </div>
@@ -388,27 +511,6 @@ export default function GenerateAssetModal({
                 </div>
               )}
 
-              {/* Video Duration */}
-              {formData.asset_type === 'video' && (
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    Duration (seconds) *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.duration_seconds}
-                    onChange={(e) => setFormData({ ...formData, duration_seconds: parseInt(e.target.value) })}
-                    disabled={isLoading}
-                    min={1}
-                    max={60}
-                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
-                  />
-                  {errors.duration_seconds && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.duration_seconds}</p>
-                  )}
-                </div>
-              )}
-
               {/* Prompt */}
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
@@ -446,11 +548,254 @@ export default function GenerateAssetModal({
                   </p>
                 </div>
               )}
+
+              {/* Reference Image - For both images and videos */}
+              {(formData.asset_type === 'image' || formData.asset_type === 'video') && (
+                <div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useReferenceImage}
+                      onChange={(e) => {
+                        setUseReferenceImage(e.target.checked);
+                        if (!e.target.checked) {
+                          setSelectedReferenceAsset(null);
+                          setFormData({ ...formData, reference_asset_id: undefined });
+                        }
+                      }}
+                      disabled={isLoading}
+                      className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700"
+                    />
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Use Reference Image
+                    </span>
+                  </label>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Select an existing asset to use as reference for the generation
+                  </p>
+
+                  {/* Selected reference asset preview */}
+                  {useReferenceImage && selectedReferenceAsset && (
+                    <div className="mt-3 p-3 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800">
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded overflow-hidden bg-zinc-100 dark:bg-zinc-700 flex-shrink-0 relative">
+                          {selectedReferenceAsset.media_url ? (
+                            <Image
+                              src={selectedReferenceAsset.media_url}
+                              alt="Reference"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <svg
+                                className="w-8 h-8 text-zinc-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50 truncate">
+                            {typeof selectedReferenceAsset.title === 'string'
+                              ? selectedReferenceAsset.title
+                              : (selectedReferenceAsset.title as any)?.en || 'Untitled'}
+                          </p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">
+                            {selectedReferenceAsset.asset_type}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReferenceAsset(null);
+                            setFormData({ ...formData, reference_asset_id: undefined });
+                          }}
+                          className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Step 4: Advanced Settings */}
+          {/* Step 4: Quality Settings */}
           {currentStep === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-50 mb-2">
+                  Quality Settings
+                </h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  Configure the output quality and dimensions for your {formData.asset_type}.
+                </p>
+              </div>
+
+              {/* Image Quality Settings */}
+              {formData.asset_type === 'image' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      Aspect Ratio
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={formData.aspect_ratio}
+                        onChange={(e) => handleAspectRatioChange(e.target.value)}
+                        disabled={isLoading}
+                        className="w-full appearance-none rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="square">Square (1:1) - 1024x1024</option>
+                        <option value="landscape">Landscape (4:3) - 1024x768</option>
+                        <option value="portrait">Portrait (3:4) - 768x1024</option>
+                        <option value="16:9">Widescreen (16:9) - 1024x576</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {formData.aspect_ratio === 'custom' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                          Width (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.width}
+                          onChange={(e) => setFormData({ ...formData, width: parseInt(e.target.value) })}
+                          disabled={isLoading}
+                          min={256}
+                          max={2048}
+                          step={64}
+                          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+                        />
+                        {errors.width && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.width}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                          Height (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.height}
+                          onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value) })}
+                          disabled={isLoading}
+                          min={256}
+                          max={2048}
+                          step={64}
+                          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+                        />
+                        {errors.height && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.height}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Video Quality Settings */}
+              {formData.asset_type === 'video' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      Resolution
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={formData.video_resolution}
+                        onChange={(e) => setFormData({ ...formData, video_resolution: e.target.value })}
+                        disabled={isLoading}
+                        className="w-full appearance-none rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="640x480">SD (640x480)</option>
+                        <option value="1280x720">HD (1280x720)</option>
+                        <option value="1280x704">HD Portrait (1280x704)</option>
+                        <option value="1024x704">Custom (1024x704)</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      Duration: {formData.duration_seconds} seconds
+                    </label>
+                    <input
+                      type="range"
+                      value={formData.duration_seconds}
+                      onChange={(e) => setFormData({ ...formData, duration_seconds: parseInt(e.target.value) })}
+                      disabled={isLoading}
+                      min={1}
+                      max={15}
+                      step={1}
+                      className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700"
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      <span>1s</span>
+                      <span>15s</span>
+                    </div>
+                    {errors.duration_seconds && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.duration_seconds}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      FPS (Frames Per Second)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.fps}
+                      onChange={(e) => setFormData({ ...formData, fps: parseInt(e.target.value) })}
+                      disabled={isLoading}
+                      min={12}
+                      max={60}
+                      step={1}
+                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
+                    />
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Default: 24 FPS (Recommended for most videos)
+                    </p>
+                    {errors.fps && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.fps}</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Step 5: Advanced Settings */}
+          {currentStep === 5 && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-50 mb-2">
@@ -485,7 +830,7 @@ export default function GenerateAssetModal({
                   className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
                 />
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Default: 7.5 - Controls how closely the generation follows the prompt (1-20)
+                  Default: 3.0 - Controls how closely the generation follows the prompt (1-20)
                 </p>
               </div>
 
@@ -503,8 +848,24 @@ export default function GenerateAssetModal({
                   className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-50"
                 />
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Default: 50 - More steps = higher quality but slower generation (1-150)
+                  Default: 30 - More steps = higher quality but slower generation (1-150)
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {submitError && (
+            <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/20">
+              <div className="flex">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700 dark:text-red-400">
+                    {submitError}
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -531,8 +892,14 @@ export default function GenerateAssetModal({
               </button>
             ) : (
               <button
-                type="submit"
-                disabled={isLoading}
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Manually call handleSubmit
+                  await handleSubmit(e as any);
+                }}
+                disabled={isLoading || !canSubmit}
                 className="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isLoading ? 'Generating...' : 'Generate Asset'}
@@ -540,6 +907,31 @@ export default function GenerateAssetModal({
             )}
           </div>
         </form>
+        </div>
+
+        {/* Media Library Selector - Right Side */}
+        {useReferenceImage && (
+          <div className="w-1/2 overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-zinc-200 dark:border-zinc-700">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Select Reference Image
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                Choose an asset to use as reference for generation
+              </p>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <MediaLibrarySelector
+                onSelect={(asset) => {
+                  setSelectedReferenceAsset(asset);
+                  setFormData({ ...formData, reference_asset_id: asset.id });
+                }}
+                selectedAssetId={formData.reference_asset_id}
+                assetType={formData.asset_type}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

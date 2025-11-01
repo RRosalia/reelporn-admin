@@ -63,4 +63,5 @@ export interface AssetFilters {
   premium?: boolean;
   type?: string;
   status?: string;
+  pornstar_id?: string;
 }

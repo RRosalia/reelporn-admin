@@ -33,6 +33,9 @@ class AssetService {
     if (filters?.status) {
       params.append('status', filters.status);
     }
+    if (filters?.pornstar_id) {
+      params.append('pornstar_id', filters.pornstar_id);
+    }
 
     const queryString = params.toString();
     const url = queryString ? `${this.basePath}?${queryString}` : this.basePath;

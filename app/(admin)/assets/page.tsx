@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { assetService } from '@/services/assetService';
 import type { Asset, PaginationMeta } from '@/types/asset';
 import GenerateAssetModal, { type GenerateAssetFormData } from '@/components/GenerateAssetModal';
+import ImageGalleryView from '@/components/ImageGalleryView';
+import AssetPreviewModal from '@/components/AssetPreviewModal';
 
 export default function AssetsPage() {
   const router = useRouter();
@@ -23,6 +25,22 @@ export default function AssetsPage() {
   const [perPage, setPerPage] = useState(15);
   const [showGenerateAssetModal, setShowGenerateAssetModal] = useState(false);
   const [generatingAsset, setGeneratingAsset] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'gallery'>(() => {
+    // Load saved view mode from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('assetsViewMode');
+      return (saved === 'gallery' || saved === 'table') ? saved : 'table';
+    }
+    return 'table';
+  });
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+
+  // Save view mode to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('assetsViewMode', viewMode);
+    }
+  }, [viewMode]);
 
   // Fetch available statuses on mount
   useEffect(() => {
@@ -87,6 +105,37 @@ export default function AssetsPage() {
     fetchAssets(page);
   };
 
+  const handleLoadMore = async () => {
+    if (!meta || currentPage >= meta.last_page || loading) return;
+
+    const nextPage = currentPage + 1;
+    try {
+      setLoading(true);
+      const response = await assetService.getAll({
+        page: nextPage,
+        per_page: perPage,
+        query: searchQuery || undefined,
+        trashed: showTrashed,
+        premium: premiumFilter === 'all' ? undefined : premiumFilter === 'premium',
+        type: typeFilter === 'all' ? undefined : typeFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
+
+      // Deduplicate assets by ID before appending
+      const newAssets = response.data || [];
+      const existingIds = new Set(assets.map(a => a.id));
+      const uniqueNewAssets = newAssets.filter(asset => !existingIds.has(asset.id));
+
+      setAssets([...assets, ...uniqueNewAssets]);
+      setMeta(response.meta);
+      setCurrentPage(nextPage);
+    } catch (err: any) {
+      console.error('Failed to load more assets:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusLabel = (statusValue: string): string => {
     const status = statuses.find(s => s.value === statusValue);
     return status ? status.label : statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
@@ -144,7 +193,8 @@ export default function AssetsPage() {
       // Refresh assets list
       fetchAssets(currentPage);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to generate asset');
+      // Re-throw the error so the modal can handle it
+      throw err;
     } finally {
       setGeneratingAsset(false);
     }
@@ -161,12 +211,44 @@ export default function AssetsPage() {
             Manage media assets and files
           </p>
         </div>
-        <button
-          onClick={() => setShowGenerateAssetModal(true)}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 cursor-pointer dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-        >
-          Generate Asset
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View Mode Toggle */}
+          <div className="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`px-4 py-2 text-sm font-medium rounded-l-lg border ${
+                viewMode === 'table'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 border-zinc-900 dark:border-zinc-50'
+                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('gallery')}
+              className={`px-4 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b ${
+                viewMode === 'gallery'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 border-zinc-900 dark:border-zinc-50'
+                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
+
+          <button
+            onClick={() => setShowGenerateAssetModal(true)}
+            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 cursor-pointer dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          >
+            Generate Asset
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -259,11 +341,21 @@ export default function AssetsPage() {
           </div>
         </div>
 
-        {loading ? (
+        {loading && assets.length === 0 ? (
           <div className="p-6 text-center text-zinc-600 dark:text-zinc-400">Loading...</div>
         ) : assets.length === 0 ? (
           <div className="p-6 text-center text-zinc-600 dark:text-zinc-400">
             {searchQuery ? 'No assets found matching your search' : 'No assets found'}
+          </div>
+        ) : viewMode === 'gallery' ? (
+          <div className="p-6">
+            <ImageGalleryView
+              assets={assets}
+              onLoadMore={handleLoadMore}
+              hasMore={meta ? currentPage < meta.last_page : false}
+              loading={loading}
+              onAssetClick={(asset) => setPreviewAsset(asset)}
+            />
           </div>
         ) : (
           <>
@@ -471,6 +563,12 @@ export default function AssetsPage() {
         onClose={() => setShowGenerateAssetModal(false)}
         onSubmit={handleGenerateAsset}
         isLoading={generatingAsset}
+      />
+
+      <AssetPreviewModal
+        asset={previewAsset}
+        isOpen={!!previewAsset}
+        onClose={() => setPreviewAsset(null)}
       />
     </div>
   );
